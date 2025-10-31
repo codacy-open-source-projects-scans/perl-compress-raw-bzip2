@@ -1,0 +1,94 @@
+name: Windows build
+
+on:
+  workflow_dispatch:
+  push:
+  pull_request:
+
+jobs:
+  build:
+
+    runs-on: windows-latest
+
+    strategy:
+      matrix:
+        perl:
+          - '5.38'
+          # - '5.36'
+          # - '5.34'
+          # - '5.32'
+          # - '5.30'
+          # - '5.28'
+          # - '5.26'
+          # - '5.24'
+
+          # - '5.22'
+          # - '5.20'
+          # - '5.18'
+          # - '5.16'
+          # - '5.14'
+          # - '5.12'
+          # - '5.10'
+          # - '5.8'
+          # - '5.6'
+        build-bzip2:
+          - 0
+          - 1
+
+    name: Perl ${{ matrix.perl }} BUILD_BZIP2:${{ matrix.build-bzip2 }}
+    steps:
+
+    - uses: actions/checkout@v4
+
+    # Windows runner doesn't have bzip2 installed, so get it from vcpkg
+
+    # next two steps derived from https://learn.microsoft.com/en-gb/vcpkg/users/binarycaching#gha
+    - uses: actions/github-script@v6
+      with:
+        script: |
+          core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+          core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+    - name: Get bzip2 library from vcpkg
+      if: matrix.build-bzip2 == 0
+      run: vcpkg install bzip2:x64-windows --binarysource="clear;x-gha,readwrite"
+
+    - name: Show installed bzip2 files created by vcpkg
+      if: matrix.build-bzip2 == 0
+      run: find /c/vcpkg/installed
+      shell: bash
+
+    - name: Show path
+      run: |
+        $Env:Path
+        dir env:
+
+    - name: Setup perl
+      uses: shogo82148/actions-setup-perl@v1
+      with:
+        perl-version: ${{ matrix.perl }}
+
+    - name: Perl version
+      run: perl -V
+
+    - name: Install dependencies
+      run: cpanm --quiet --installdeps --notest .
+
+    - name: Build with included Bzip2 source
+      if: matrix.build-bzip2 == 1
+      run: perl Makefile.PL && make
+      env:
+        BUILD_BZIP2: ${{ matrix.build-bzip2 }}
+        BZIP2_INCLUDE: ${GITHUB_WORKSPACE}\bzip2-src
+        BZIP2_LIB: bzip2-src
+
+    - name: Build with system bzip2
+      if: matrix.build-bzip2 == 0
+      run: perl Makefile.PL && make
+      env:
+        BUILD_BZIP2: ${{ matrix.build-bzip2 }}
+        BZIP2_INCLUDE: C:\vcpkg\installed\x64-windows\include
+        BZIP2_LIB: C:\vcpkg\installed\x64-windows\lib
+
+    - name: Test
+      run: make test

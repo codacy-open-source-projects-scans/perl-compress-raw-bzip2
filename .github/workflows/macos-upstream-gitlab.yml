@@ -1,0 +1,122 @@
+name: MacOS + Upstream GitLab Bzip2 1.1
+
+on:
+  workflow_dispatch:
+  push:
+  pull_request:
+  schedule:
+      - cron: '02 02 * * 6'    # Run every Saturday
+
+jobs:
+  build:
+
+    runs-on: macos-latest
+
+    strategy:
+      matrix:
+        perl:
+          - '5.42'
+          # - '5.40'
+          # - '5.38'
+          # - '5.36'
+          # - '5.34'
+          # - '5.32'
+          # - '5.30'
+          # - '5.28'
+          # - '5.26'
+          # - '5.24'
+          # - '5.22'
+          # - '5.20'
+          # - '5.18'
+          # - '5.16'
+          # - '5.14'
+          # - '5.12'
+          # - '5.10'
+          # - '5.8'
+          # - '5.6'
+        upstream-branch-name:
+          - master
+        upstream-bzip2-version:
+          - '1.1.0'
+
+
+    env:
+      bzip2-source:      ${{ github.workspace }}/upstream-bzip2-source
+      bzip2-install:     ${{ github.workspace }}/upstream-bzip2-install
+      BZIP2_LIB:         ${{ github.workspace }}/upstream-bzip2-install/lib
+      BZIP2_INCLUDE:     ${{ github.workspace }}/upstream-bzip2-install/include
+      BZIP2_VERSION:     ${{ matrix.upstream-bzip2-version }}
+      BUILD_BZIP2:       0
+
+    defaults:
+      run:
+        working-directory: repo
+
+    name: Perl ${{ matrix.perl }} + Upstream GitLab '${{ matrix.upstream-branch-name }}'
+    steps:
+
+    # - name: Checkout upstream bzip2 '${{matrix.upstream-branch-name}}'
+    #   uses: actions/checkout@v4
+    #   with:
+    #     repository: https://gitlab.com/bzip2/bzip2.git
+    #     ref: ${{ matrix.upstream-branch-name }}
+    #     path: ${{ env.bzip2-source }}
+
+    - uses: actions/checkout@v4
+      with:
+        path: repo
+
+    - name: Make Paths
+      run: |
+        mkdir -p ${{ env.bzip2-source }}
+        mkdir -p ${{ env.bzip2-install }}
+        mkdir -p ${{ github.workspace }}/repo
+
+    - name: Checkout upstream bzip2 '${{matrix.upstream-branch-name}}'
+      run: |
+        git clone --depth 1 https://gitlab.com/bzip2/bzip2.git .
+      working-directory: ${{ env.bzip2-source }}
+
+    - name: Build upstream bzip2 '${{matrix.upstream-branch-name}}''
+      run: |
+        mkdir build
+        cd build
+        cmake .. -DCMAKE_INSTALL_PREFIX=${{ env.bzip2-install }}
+        make install VERBOSE=1
+        make clean
+      working-directory: ${{ env.bzip2-source }}
+
+    - name: Show Installed Bzip2 files in ${{ env.bzip2-install }}
+      run: |
+        find .
+      working-directory: ${{ env.bzip2-install }}
+
+    - name: Setup perl
+      uses: shogo82148/actions-setup-perl@v1
+      with:
+        perl-version: ${{ matrix.perl }}
+
+    - name: Perl version
+      run: perl -V
+
+    # - name: Install dependencies
+    #   run: cpanm --quiet --installdeps --notest .
+
+    - name: Build
+      run: |
+        flags=$( perl -MConfig -e 'print $Config::Config{ccflags}' )
+        perl Makefile.PL CCFLAGS="$flags -Werror" && make
+
+    - name: Test
+      run: make test
+
+    - name: Check Bzip2 Version
+      run: |
+        perl -Mblib -MCompress::Raw::Bzip2 -e '
+          my $expected = "${{ env.BZIP2_VERSION }}";
+          my $got = Compress::Raw::Bzip2::bzlibversion() ;
+          print "Expected: $expected\n" ;
+          print "Got:      $got\n";
+          die "Unexpected Bzip2 version\n"
+            if $expected ne $got;
+          '
