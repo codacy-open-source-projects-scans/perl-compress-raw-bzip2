@@ -4,14 +4,14 @@ package Compress::Raw::Bzip2;
 use strict ;
 use warnings ;
 
-require 5.006 ;
+require 5.008 ;
 require Exporter;
 use Carp ;
 
 use bytes ;
 our ($VERSION, $XS_VERSION, @ISA, @EXPORT, $AUTOLOAD);
 
-$VERSION = '2.218';
+$VERSION = '2.225';
 $XS_VERSION = $VERSION;
 $VERSION = eval $VERSION;
 
@@ -376,7 +376,7 @@ See the module L<Compress::Bzip2|Compress::Bzip2>
 
 =head1 AUTHOR
 
-This module was written by Paul Marquess, C<pmqs@cpan.org>.
+This module was written by Paul Marquess, C<pmqs@outlook.com>.
 
 =head1 MODIFICATION HISTORY
 
